@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 22;
+use Test::More tests => 29;
 
 use_ok('Class::Interfaces' =>  (
     Serializable   => [ 'pack', 'unpack' ],
@@ -77,3 +77,59 @@ eval {
     Class::Interfaces->_method_stub();
 };
 like($@, qr/Method Not Implemented/, '... got the error we expected');
+
+eval {
+    Serializable->pack();
+};
+like($@, qr/Method Not Implemented/, '... got the error we expected');
+
+# test the subclass ability
+{
+    package My::Test::Interfaces;
+    
+    our @ISA = 'Class::Interfaces';
+    
+    sub _build_interface_package {
+        my $pkg = (shift)->SUPER::_build_interface_package(@_);
+        $pkg .= "\nsub other_method { 'other_method' }";
+        return $pkg;
+    }
+    sub _error_handler { die "Error Has Been Handled" }
+    sub _method_stub { die "My Custom Exception" }
+}
+
+eval {
+    My::Test::Interfaces->import(
+        '+' => []
+        );
+};
+like($@, qr/Error Has Been Handled/, '... got the error we exepected');
+
+eval {
+    My::Test::Interfaces->import(TestInterface => [ 'test' ]);
+};
+ok(!$@, '... created our Class::Interfaces subclass ok');
+    
+eval {
+    TestInterface->test();
+};
+like($@, qr/My Custom Exception/, '... got the error we expected');    
+
+can_ok('TestInterface', 'other_method');
+
+# test the subclass ability
+{
+    package My::Other::Test::Interfaces;
+    
+    our @ISA = 'Class::Interfaces';
+}
+
+eval {
+    My::Other::Test::Interfaces->import(OtherTestInterface => [ 'test' ]);
+};
+ok(!$@, '... created our Class::Interfaces subclass ok');
+    
+eval {
+    OtherTestInterface->test();
+};
+like($@, qr/Method Not Implemented/, '... got the error we expected');  

@@ -4,10 +4,10 @@ package Class::Interfaces;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub import {
-    shift;
+    my $class = shift;
     my %interfaces = @_;
     foreach my $interface (keys %interfaces) {
         # build the interface
@@ -23,14 +23,14 @@ sub import {
                 else {
                     # if its another kind of ref, its an error
                     (!ref($interface_spec->{isa}))
-                        || die "Interface ($interface) isa list must be an array reference";
+                        || $class->_error_handler("Interface ($interface) isa list must be an array reference");
                     # otherwise its just a single item
                     @subclasses = $interface_spec->{isa};
                 }
             }
             if (exists ${$interface_spec}{methods}) {
                 (ref($interface_spec->{methods}) eq 'ARRAY')
-                    || die "Method list for Interface ($interface) must be an array reference";
+                    || $class->_error_handler("Method list for Interface ($interface) must be an array reference");
                 @methods = @{$interface_spec->{methods}};
             }
         }
@@ -38,23 +38,35 @@ sub import {
             @methods = @{$interfaces{$interface}};
         }
         else {
-            die "Cannot use a " . $interfaces{$interface} . " to build an interface";
+            $class->_error_handler("Cannot use a " . $interfaces{$interface} . " to build an interface");
         }
         # now create the interfaces
-        my $package = "package $interface;";
-        $package .= "\@${interface}::ISA = qw(" . (join " " => @subclasses) . ");" if @subclasses;
+        my $package = $class->_build_interface_package($interface, @subclasses);
         eval $package;
-        die "Could not create Interface ($interface) because : $@" if $@;
+        $class->_error_handler("Could not create Interface ($interface) because", $@) if $@;
         eval {
             no strict 'refs';
             foreach my $method (@methods) {
                 ($method !~ /^BEGIN|INIT|CHECK|END|DESTORY|AUTOLOAD|import|bootstrap$/)
-                    || die "Cannot create an interface using reserved perl methods";
-                *{"${interface}::${method}"} = \&_method_sub;
+                    || $class->_error_handler("Cannot create an interface using reserved perl methods");
+                *{"${interface}::${method}"} = $class->can('_method_stub');
             }
         };
-        die "Could not create sub methods for Interface ($interface) because : $@" if $@;  
+        $class->_error_handler("Could not create sub methods for Interface ($interface) because", $@) if $@;  
     }
+}
+
+sub _build_interface_package {
+    my ($class, $interface, @subclasses) = @_;
+    my $package = "package $interface;";
+    $package .= "\@${interface}::ISA = qw(" . (join " " => @subclasses) . ");" if @subclasses;
+    return $package;
+}
+
+sub _error_handler { 
+    my ($class, $message, $sub_exception) = @_;
+    die "$message : $sub_exception" if $sub_exception;
+    die "$message";
 }
 
 sub _method_stub { die "Method Not Implemented" }
@@ -102,7 +114,7 @@ This module provides a simple means to define abstract class interfaces, which c
 
 =head2 Interface Polymorphism
 
-Interface polymorphism is a very powerful concept in object oriented programming. The concept is that if a class I<implements> a given interface it is expected to follow the guidelines set down by that interface. This in essence is a contract between the implementing class an all other classes, which says that it will provide correct implementations of the interfaces abstract methods. So it then becomes possible to treat an instance of an implementing class according to the interface and not need to know much of anything about the actual class itself. This can lead to highly generic code which is able to work with a wide range of virtually arbitrary classes just by using the methods of the certain interface which the class implements. Here is an example, using the interfaces from the L<SYNOPSIS> section:
+Interface polymorphism is a very powerful concept in object oriented programming. The concept is that if a class I<implements> a given interface it is expected to follow the guidelines set down by that interface. This in essence is a contract between the implementing class an all other classes, which says that it will provide correct implementations of the interface's abstract methods. Through this, it then becomes possible to treat an instance of an implementing class according to the interface and not need to know much of anything about the actual class itself. This can lead to highly generic code which is able to work with a wide range of virtually arbitrary classes just by using the methods of the certain interface which the class implements. Here is an example, using the interfaces from the L<SYNOPSIS> section:
 
   my $list = get_list();
   if ($list->isa('Iterable')) {
@@ -146,6 +158,10 @@ Now, this may seem like there is a lot of manual type checking, branching and er
 
 While the java-esque example is much shorter, it is really doing the same thing, just all the type checking and error handling is performed by the language itself. But the power of the concept of interface polymorphism is not lost.
 
+=head2 Subclassing Class::Interfaces
+
+For the most part, you will never need to subclass Class::Interfaces since it's default behavior will most likley be sufficient for most class stub generating needs. However, it is now possible (as of 0.02) to subclass Class::Interfaces and customize some of it's behavior. Below in the L<CLASS METHODS> section, you will find a list of methods which you can override in your Class::Interfaces subclass and therefore customize how your interfaces are built.
+
 =head1 INTERFACE
 
 Class::Interfaces is interacted with through the C<use> interface. It expects a hash of interface descriptors in the following formats.
@@ -180,9 +196,33 @@ Obviously only one form of the C<isa> key can be used at a time (as the second w
 
 =back
 
+=head1 CLASS METHODS
+
+The following methods are class methods, which if you like, can be overriden by a subclass of Class::Interfaces. This can be used to customize the building of interfaces for your specific needs.
+
+=over
+
+=item B<_build_interface_package ($class, $interface, @subclasses)>
+
+This method is used to construct a the interface package itself, it just creates and returns a string which Class::Interfaces will then C<eval> into being. 
+
+This method can be customized to do any number of things, such as; add a specified namespace prefix onto the C<$interface> name, add additional classes into the C<@subclasses> list, basically preprocess any of the arguments in any number of ways. 
+
+=item B<_error_handler ($class, $message, $sub_exception)>
+
+All errors which might happen during class generation are sent through this routine. The main use of this is if your application is excepting object-based exceptions and not just string-based exceptions, you can customize this to do that for you.
+
+=item B<_method_stub ($class)>
+
+When a method is created in the interface, it is given a default implementation (or stub). This usually will die with the string "Method Not Implemented", however, this may not always be what you want it to do. 
+
+This can be used much like C<_error_handler> in that you can make it throw an object-based exception if that is what you application expects. But it can also be used to log missing methods, or to not do anything and just allow things to fail silently too. It is all dependent upon your needs.
+
+=back
+
 =head1 TO DO
 
-The documentation needs work, but my head is swimming from allergies so this is good for now. 
+The documentation needs some work. 
 
 =head1 BUGS
 

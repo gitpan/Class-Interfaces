@@ -1,5 +1,9 @@
 Revision history for Perl extension Class-Interfaces.
 
+0.02 Wed Nov 10 2004
+    - broke out some of the inteface building functionality
+      into methods so they can be overriden in a subclass.
+
 0.01 Sat Oct  9 18:23:45 2004
     - module created
 
