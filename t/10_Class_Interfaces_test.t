@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 29;
+use Test::More tests => 30;
 
 use_ok('Class::Interfaces' =>  (
     Serializable   => [ 'pack', 'unpack' ],
@@ -65,6 +65,13 @@ eval {
 };
 like($@, qr/Could not create Interface \(\+\) because \: /, '... got the error we exepected');
 
+
+eval {
+    Class::Interfaces->import(
+        Pass => [ 'my_import_sub' ]
+        );
+};	
+ok(!$@, '... this passed fine');
 
 eval {
     Class::Interfaces->import(

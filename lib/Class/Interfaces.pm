@@ -4,7 +4,7 @@ package Class::Interfaces;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub import {
     my $class = shift;
@@ -47,7 +47,7 @@ sub import {
         eval {
             no strict 'refs';
             foreach my $method (@methods) {
-                ($method !~ /^BEGIN|INIT|CHECK|END|DESTORY|AUTOLOAD|import|bootstrap$/)
+                ($method !~ /^(BEGIN|INIT|CHECK|END|DESTORY|AUTOLOAD|import|bootstrap)$/)
                     || $class->_error_handler("Cannot create an interface using reserved perl methods");
                 *{"${interface}::${method}"} = $class->can('_method_stub');
             }
@@ -115,30 +115,28 @@ This module provides a simple means to define abstract class interfaces, which c
 =head2 Interface Polymorphism
 
 Interface polymorphism is a very powerful concept in object oriented programming. The concept is that if a class I<implements> a given interface it is expected to follow the guidelines set down by that interface. This in essence is a contract between the implementing class an all other classes, which says that it will provide correct implementations of the interface's abstract methods. Through this, it then becomes possible to treat an instance of an implementing class according to the interface and not need to know much of anything about the actual class itself. This can lead to highly generic code which is able to work with a wide range of virtually arbitrary classes just by using the methods of the certain interface which the class implements. Here is an example, using the interfaces from the L<SYNOPSIS> section:
-
-  my $list = get_list();
-  if ($list->isa('Iterable')) {
+  
+  eval {
+      my $list = get_list();
+      $list->isa('Iterable') || die "Unable to process $list : is not an Iterable object";
       my $iterator = $list->iterator();
-      if ($iterator->isa('Iterator') {
-          while ($iterator->hasNext()) {
-              my $current = $iterator->next();
-              if ($current->isa('Serializable')) {
-                  store_into_database($current->pack());
-              }
-              elsif ($current->isa('Printable')) {
-                  store_into_database($current->toString());
-              }
-              else {
-                  warn "Unable to store $current into database : unrecognized object type";
-              }
+      $iterator->isa('Iterator') || die "Unrecognized iterator type : $iterator";
+      while ($iterator->hasNext()) {
+          my $current = $iterator->next();
+          if ($current->isa('Serializable')) {
+              store_into_database($current->pack());
           }
-      else {
-          warn "Unrecognized iterator type : $iterator";
+          elsif ($current->isa('Printable')) {
+              store_into_database($current->toString());
+          }
+          else {
+              die "Unable to store $current into database : unrecognized object type";
+          }
       }
-  }
-  else {
-      warn "Unable to process list : is not an Iterable object";
-  }
+  };
+  if ($@) {
+      # ... do something with the exception
+  }  
   
 Now, this may seem like there is a lot of manual type checking, branching and error handling, this is due to perl's object type system. Some say that perl is a strongly typed langugage because a SCALAR cannot be converted (cast) as an ARRAY, and conversions to a HASH can only be done in limited circumstances. Perl enforces these rules at both compile and run time. However, this strong typing breaks down when it comes to perl's object system. If we could enforce object types in the same way we can enforce SCALAR, ARRAY and HASH types, then the above code would need less manual type checking and therefore less branching and error handling. For instance, below is a java-esque example of the same code, showing how type checking would simplify things.
   
@@ -247,6 +245,14 @@ I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Deve
 =item L<Object::Interface>
 
 =item L<interface>
+
+=back
+
+=head1 ACKNOWLEDGEMENTS
+
+=over 4
+
+=item Thanks for Matthew Simon Cavalletto for pointing out a problem with a reg-exp and for suggestions on the documentation.
 
 =back
 
