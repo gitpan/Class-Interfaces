@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 30;
+use Test::More tests => 32;
 
 use_ok('Class::Interfaces' =>  (
     Serializable   => [ 'pack', 'unpack' ],
@@ -123,6 +123,7 @@ eval {
 like($@, qr/My Custom Exception/, '... got the error we expected');    
 
 can_ok('TestInterface', 'other_method');
+is(TestInterface->other_method(), 'other_method', '... got the value we expected');
 
 # test the subclass ability
 {
@@ -140,3 +141,12 @@ eval {
     OtherTestInterface->test();
 };
 like($@, qr/Method Not Implemented/, '... got the error we expected');  
+
+# test marker interfaces
+
+Class::Interfaces->import(
+    Marker => undef
+    );
+
+eval "package MarkerTest; use base 'Marker';";
+ok(!$@, '... we should not get an exception here');

@@ -4,7 +4,7 @@ package Class::Interfaces;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 sub import {
     my $class = shift;
@@ -37,6 +37,11 @@ sub import {
         elsif (ref($interfaces{$interface}) eq 'ARRAY') {
             @methods = @{$interfaces{$interface}};
         }
+        elsif (!defined($interfaces{$interface})) {
+            # allow undefined here, this indicates an empty
+            # interface, sometimes called a marker interface
+            ;
+        }
         else {
             $class->_error_handler("Cannot use a " . $interfaces{$interface} . " to build an interface");
         }
@@ -45,11 +50,21 @@ sub import {
         eval $package;
         $class->_error_handler("Could not create Interface ($interface) because", $@) if $@;
         eval {
-            no strict 'refs';
+            my $method_stub = $class->can('_method_stub');    
+            no strict 'refs';            
+            # without at least this VERSION declaration
+            # a Marker interface will not work with
+            # 'use base' basically it would complain
+            # that the package is empty.      
+            # we only assign this if the VERSION is already
+            # empty too, so we don't step on any customizations
+            # done in subclasses.
+            ${"${interface}::"}{VERSION} ||= -1;
+            # now we create all our methods :)
             foreach my $method (@methods) {
                 ($method !~ /^(BEGIN|INIT|CHECK|END|DESTORY|AUTOLOAD|import|bootstrap)$/)
                     || $class->_error_handler("Cannot create an interface using reserved perl methods");
-                *{"${interface}::${method}"} = $class->can('_method_stub');
+                *{"${interface}::${method}"} = $method_stub;
             }
         };
         $class->_error_handler("Could not create sub methods for Interface ($interface) because", $@) if $@;  
@@ -106,6 +121,13 @@ Class::Interfaces - A module for defining interface classes inline
       ResetableBiDirectionalIterator => { 
           isa => [ 'ResetableIterator', 'BiDirectionalIterator' ]
           }
+      );
+      
+  # it is also possible to create an 
+  # empty interface, sometimes called 
+  # a marker interface
+  use Class::Interfaces (
+      JustAMarker => undef
       );
 
 =head1 DESCRIPTION
@@ -168,7 +190,7 @@ Class::Interfaces is interacted with through the C<use> interface. It expects a 
 
 =item E<lt>I<interface name>E<gt> =E<gt> [ E<lt>list of method namesE<gt> ]
 
-An interface can be simply described as an ARRAY reference containing method labels as strings.
+An interface can be simply described as either an ARRAY reference containing method labels as strings, or as C<undef> for empty (marker) interfaces. 
 
 =item E<lt>I<interface name>E<gt> =E<gt> { E<lt>interface descriptionE<gt> }
 
@@ -230,13 +252,13 @@ None that I am aware of. Of course, if you find a bug, let me know, and I will b
 
 I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover> report on this module test suite.
 
- ------------------------ ------ ------ ------ ------ ------ ------ ------
- File                       stmt branch   cond    sub    pod   time  total
- ------------------------ ------ ------ ------ ------ ------ ------ ------
- Class/Interfaces.pm       100.0  100.0    n/a  100.0    n/a  100.0  100.0
- ------------------------ ------ ------ ------ ------ ------ ------ ------
- Total                     100.0  100.0    n/a  100.0    n/a  100.0  100.0
- ------------------------ ------ ------ ------ ------ ------ ------ ------
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ File                           stmt branch   cond    sub    pod   time  total
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Class/Interfaces.pm           100.0  100.0   50.0  100.0    n/a  100.0   98.9
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Total                         100.0  100.0   50.0  100.0    n/a  100.0   98.9
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 SEE ALSO
 

@@ -1,5 +1,10 @@
 Revision history for Perl extension Class-Interfaces.
 
+0.04 Fri Dec 10 2004
+    - improved the interface to allow for empty 'marker'
+      interfaces, which play nice with 'use base'
+        - added a few tests for this
+
 0.03 Fri Nov 12 2004
     - Thanks to Matthew Simon Cavalletto for pointing out the
       problem with the reg-exp on line 50. 
